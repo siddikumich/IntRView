@@ -14,6 +14,7 @@ function App() {
   const [error, setError] = useState(null);
   const MOCK_USER_ID = "test-user-123"; //THIS IS FOR TESTING THE USER FUNCTION
 
+
   const handleStartInterview = async () => {
     if (!problem.trim() || !code.trim()) {
       setError('Please provide both the problem description and your code.');
@@ -71,13 +72,27 @@ function App() {
     } catch (error) {
       console.error("Error sending message:", error);
       setError(`Error fetching response: ${error.message}`);
-      // Add an error message to the chat UI
+      // ERROR MESSAGE
       setMessages(prev => [...prev, { role: 'model', text: 'My apologies, I encountered an error. Please try again.' }]);
     } finally {
       setIsLoading(false);
     }
   };
-
+  //TESTING FIREBASE
+  useEffect(() => {
+    const testFetch = async () => {
+      console.log("Attempting to fetch chats for user:", MOCK_USER_ID);
+      try {
+        const userChats = await getChatsFromFirestore(MOCK_USER_ID);
+        console.log("Fetched Chats:", userChats);
+        // Later, you would set these to state to display them in the UI
+      } catch (error) {
+        console.error("Could not fetch chats.", error);
+      }
+    };
+  
+    testFetch();
+  }, []);
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
       <ProblemInput
@@ -98,6 +113,7 @@ function App() {
       />
     </div>
   );
+
 }
 
 export default App;
