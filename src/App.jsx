@@ -2,7 +2,9 @@ import { useState } from 'react';
 import ProblemInput from './components/ProblemInput';
 import Chat from './components/Chat';
 import { callGeminiAPI, generateInitialPrompt } from './services/api';
+import { saveChatToFirestore, getChatsFromFirestore } from './services/api'; 
 
+//app gets imported to main.jsx 
 function App() {
   const [problem, setProblem] = useState('');
   const [code, setCode] = useState('');
@@ -10,6 +12,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const MOCK_USER_ID = "test-user-123"; //THIS IS FOR TESTING THE USER FUNCTION
 
   const handleStartInterview = async () => {
     if (!problem.trim() || !code.trim()) {
@@ -49,11 +52,26 @@ function App() {
     setError(null);
 
     try {
+      // 1. Call the API ONCE to get the AI's response
       const response = await callGeminiAPI(historyForApi);
-      setMessages(prev => [...prev, { role: 'model', text: response }]);
+      
+      // 2. Create the final, complete list of messages
+      const updatedMessages = [...messages, newUserMessage, { role: 'model', text: response }];
+
+      // 3. Update the UI with the AI's response
+      setMessages(updatedMessages);
+      
+      // 4. Save the complete, final chat to Firestore
+      await saveChatToFirestore(MOCK_USER_ID, {
+        problem: problem,
+        code: code,
+        messages: updatedMessages 
+      });
+
     } catch (error) {
       console.error("Error sending message:", error);
       setError(`Error fetching response: ${error.message}`);
+      // Add an error message to the chat UI
       setMessages(prev => [...prev, { role: 'model', text: 'My apologies, I encountered an error. Please try again.' }]);
     } finally {
       setIsLoading(false);

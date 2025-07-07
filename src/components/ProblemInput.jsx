@@ -8,10 +8,12 @@ export default function ProblemInput({
     error 
   }) {
     return (
+        //division
       <div className="w-1/2 p-6 flex flex-col space-y-4 overflow-y-auto">
-        <h1 className="text-3xl font-bold text-cyan-400">LeetCode AI Interviewer</h1>
+        //header
+        <h1 className="text-3xl font-bold text-cyan-400">LeetCode AI Interviewer</h1> 
+        //paragraph
         <p className="text-gray-400">Paste your problem and code below, then start the interview.</p>
-        
         <div>
           <label htmlFor="problem" className="block text-sm font-medium text-gray-300 mb-2">
             Problem Description
@@ -20,7 +22,7 @@ export default function ProblemInput({
             id="problem"
             rows="10"
             className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none transition"
-            placeholder="e.g., Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target."
+            placeholder="e.g., Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to the target."
             value={problem}
             onChange={(e) => setProblem(e.target.value)}
             disabled={interviewStarted}

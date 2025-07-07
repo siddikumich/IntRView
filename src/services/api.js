@@ -1,3 +1,5 @@
+import { db } from '../firebase';
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 // API service for Gemini API calls
 export const callGeminiAPI = async (chatHistory) => {
     // Get API key from environment variables
@@ -62,3 +64,59 @@ export const callGeminiAPI = async (chatHistory) => {
   
   Begin the interview now.`;
   };
+
+/**
+ * Saves a completed chat session to Firestore for a specific user.
+ * @param {string} userId - The ID of the currently logged-in user.
+ * @param {object} chatData - An object containing the problem, code, and messages array.
+ */
+export const saveChatToFirestore = async (userId, chatData) => {
+  if (!userId) {
+    throw new Error("User is not logged in.");
+  }
+  try {
+    // Create a reference to the user's "chats" sub-collection
+    const chatsCollectionRef = collection(db, "users", userId, "chats");
+    
+    // Add a new document to that collection
+    await addDoc(chatsCollectionRef, {
+      ...chatData, // This includes problem, code, and messages
+      createdAt: serverTimestamp() // Adds a server-side timestamp
+    });
+    console.log("Chat successfully saved!");
+  } catch (error) {
+    console.error("Error saving chat to Firestore: ", error);
+    throw error; // Re-throw the error to be handled by the component
+  }
+};
+
+/**
+ * Fetches all chat sessions for a specific user.
+ * @param {string} userId - The ID of the currently logged-in user.
+ * @returns {Promise<Array>} A promise that resolves to an array of chat objects.
+ */
+export const getChatsFromFirestore = async (userId) => {
+  if (!userId) {
+    throw new Error("User is not logged in.");
+  }
+  try {
+    const chatsCollectionRef = collection(db, "users", userId, "chats");
+    const q = query(chatsCollectionRef); // You could add ordering here later if needed
+    
+    const querySnapshot = await getDocs(q);
+    
+    const chats = [];
+    querySnapshot.forEach((doc) => {
+      chats.push({
+        id: doc.id, // The unique ID of the chat document
+        ...doc.data() // The content of the chat (problem, code, messages)
+      });
+    });
+    
+    console.log("Chats successfully fetched!");
+    return chats;
+  } catch (error) {
+    console.error("Error fetching chats from Firestore: ", error);
+throw error;
+  }
+};
