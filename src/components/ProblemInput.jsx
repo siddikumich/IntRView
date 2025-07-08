@@ -10,9 +10,7 @@ export default function ProblemInput({
     return (
         //division
       <div className="w-1/2 p-6 flex flex-col space-y-4 overflow-y-auto">
-        //header
         <h1 className="text-3xl font-bold text-cyan-400">LeetCode AI Interviewer</h1> 
-        //paragraph
         <p className="text-gray-400">Paste your problem and code below, then start the interview.</p>
         <div>
           <label htmlFor="problem" className="block text-sm font-medium text-gray-300 mb-2">

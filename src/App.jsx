@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProblemInput from './components/ProblemInput';
 import Chat from './components/Chat';
 import { callGeminiAPI, generateInitialPrompt } from './services/api';
@@ -8,6 +8,7 @@ import { saveChatToFirestore, getChatsFromFirestore } from './services/api';
 function App() {
   const [problem, setProblem] = useState('');
   const [code, setCode] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true); //firebaseFix
   const [interviewStarted, setInterviewStarted] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,20 +80,24 @@ function App() {
     }
   };
   //TESTING FIREBASE
-  useEffect(() => {
-    const testFetch = async () => {
-      console.log("Attempting to fetch chats for user:", MOCK_USER_ID);
-      try {
-        const userChats = await getChatsFromFirestore(MOCK_USER_ID);
-        console.log("Fetched Chats:", userChats);
-        // Later, you would set these to state to display them in the UI
-      } catch (error) {
-        console.error("Could not fetch chats.", error);
-      }
-    };
-  
-    testFetch();
-  }, []);
+    useEffect(() => {
+        const testFetch = async () => {
+        const MOCK_USER_ID = "test-user-123"; 
+    
+        console.log("Attempting to fetch chats for user:", MOCK_USER_ID);
+        try {
+            const userChats = await getChatsFromFirestore(MOCK_USER_ID);
+            console.log("Fetched Chats:", userChats);
+        } catch (error) {
+            console.error("Could not fetch chats.", error);
+            setError("Could not load previous chats. Please check your connection or Firebase setup.");
+        } finally {
+            setIsInitialLoading(false);
+        }
+        };
+    
+        testFetch();
+    }, []); // The empty array [] is correct, it means this runs only once.
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
       <ProblemInput
