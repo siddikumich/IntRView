@@ -17,3 +17,15 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 export { db, auth };
+
+//DEBUGGING
+console.log('Firebase Config:', {
+  apiKey: firebaseConfig.apiKey ? 'Set' : 'Missing',
+  authDomain: firebaseConfig.authDomain ? 'Set' : 'Missing',
+  projectId: firebaseConfig.projectId ? 'Set' : 'Missing',
+  // Don't log actual values for security
+});
+
+// Check if Firebase initialized correctly
+console.log('Firebase app:', app);
+console.log('Firebase auth:', auth);
