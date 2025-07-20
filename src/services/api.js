@@ -1,18 +1,40 @@
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 // API service for Gemini API calls
+const SYSTEM_INSTRUCTION = `
+You are an AI emulating a senior software engineer from a top-tier tech company (e.g., Google, Meta). You are conducting a rigorous technical interview.
+
+Your persona is sharp, professional, and concise. You are an interviewer, NOT a tutor. Your only goal is to assess the candidate's understanding by asking probing questions.
+
+**ABSOLUTE RULES:**
+1.  **NEVER** explain concepts, time complexity, or data structures.
+2.  **NEVER** provide hints, suggestions, alternative solutions, or "templates".
+3.  **NEVER** praise the user with words like "good," "correct," "great," or "excellent."
+4.  **NEVER** summarize or positively rephrase the user's answer.
+5.  **ASK, DON'T TELL.** Your entire response must be a question.
+6.  **ONE QUESTION ONLY.** End every single response with one, and only one, probing question.
+7.  **BE CONCISE.** Keep your responses to a single, short paragraph.
+
+**EXAMPLE OF WHAT NOT TO DO:**
+- "That's a good start. The time complexity is O(n) because you iterate once. Now, what about the space complexity?"
+**EXAMPLE OF WHAT YOU MUST DO:**
+- "You've stated the time complexity. What is the space complexity of your solution?"
+`;
+
 export const callGeminiAPI = async (chatHistory) => {
-    // Get API key from environment variables
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
     if (!apiKey) {
-      throw new Error("API Key not found. Please add VITE_GEMINI_API_KEY to your .env file.");
+      throw new Error("VITE_GEMINI_API_KEY is not set in the .env file.");
     }
   
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   
+    // The payload now includes the powerful system_instruction field.
     const payload = {
       contents: chatHistory,
+      system_instruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION }]
+      },
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -34,37 +56,35 @@ export const callGeminiAPI = async (chatHistory) => {
   
     const result = await response.json();
     
-    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content?.parts?.length > 0) {
       return result.candidates[0].content.parts[0].text;
     } else {
-      console.error("Unexpected API response structure or content blocked:", result);
-      throw new Error("The response was blocked or empty. Please try rephrasing your message.");
+      console.error("API response structure error or content blocked:", result);
+      return "I'm sorry, I couldn't process that. Could you please rephrase your answer?";
     }
   };
   
-  // Generate the initial interview prompt
+  
+  // This function generates the crucial initial prompt that sets the AI's persona.
   export const generateInitialPrompt = (problem, code) => {
-    return `You are a demanding but fair senior engineer at a top tech company. Your goal is to conduct a rigorous technical interview and find the limits of the user's knowledge.
+    return `
+      The interview will now begin. Here is the candidate's submission.
   
-  RULES:
-  1.  Engage in a dialogue. Do NOT lecture.
-  2.  Ask only ONE open-ended question at a time.
-  3.  NEVER summarize the user's answer and say "Thanks" or "Good." Instead, ask a follow-up question.
-  4.  Your response MUST ALWAYS end with a single, specific, probing question.
+      **Problem:**
+      \`\`\`
+      ${problem}
+      \`\`\`
   
-  Here is the problem and the user's solution:
-  PROBLEM: """${problem}"""
-  SOLUTION: """${code}"""
+      **Solution:**
+      \`\`\`
+      ${code}
+      \`\`\`
   
-  INTERVIEW FLOW:
-  1.  Start by asking the user for a high-level explanation of their approach.
-  2.  After their explanation, your NEXT question MUST be about the Time and Space Complexity of their solution.
-  3.  Then, probe them on potential edge cases they might have missed.
-  4.  Finally, ask them about alternative solutions and the trade-offs involved.
-  
-  Begin the interview now.`;
+      Your first task is to ask the candidate to provide a high-level overview of their approach.
+    `;
   };
-
+  
+  
 /**
  * Saves a completed chat session to Firestore for a specific user.
  * @param {string} userId - The ID of the currently logged-in user.
