@@ -17,7 +17,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // NEW: State for managing chat history and active chat
+  // State for managing chat history and active chat
   const [savedChats, setSavedChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -31,6 +31,7 @@ function App() {
         getChatsForUser(currentUser.uid);
       } else {
         setSavedChats([]); // Clear chats on logout
+        handleNewChat(); // Reset the view to a clean state
         setIsInitialLoading(false);
       }
     });
@@ -41,7 +42,6 @@ function App() {
     setIsInitialLoading(true);
     try {
       const chatsCollectionRef = collection(db, "users", userId, "chats");
-      // NEW: Order chats by creation date, newest first
       const q = query(chatsCollectionRef, orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const userChats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -54,10 +54,27 @@ function App() {
     }
   };
 
-  const signInWithGoogle = async () => { /* ... (no change) ... */ };
-  const handleSignOut = async () => { /* ... (no change) ... */ };
+  // --- FIXED AUTH FUNCTIONS ---
+  const signInWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Error signing in with Google: ", error);
+      setError("Failed to sign in with Google.");
+    }
+  };
 
-  // --- Chat Management Logic (NEW FUNCTIONS) ---
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      setError("Failed to sign out.");
+    }
+  };
+
+  // --- Chat Management Logic ---
 
   const handleNewChat = () => {
     setActiveChatId(null);
@@ -78,14 +95,14 @@ function App() {
     }
   };
 
-  // --- Core Interview Logic (MODIFIED) ---
+  // --- Core Interview Logic ---
 
   const handleStartInterview = async () => {
     if (!problem.trim() || !code.trim() || !user) return;
     
     setError(null);
     setIsLoading(true);
-    setMessages([]); // Start with a clean slate 
+    setMessages([]);
 
     const initialPrompt = generateInitialPrompt(problem, code);
     const initialHistory = [{ role: 'user', parts: [{ text: initialPrompt }] }];
@@ -94,18 +111,18 @@ function App() {
       const response = await callGeminiAPI(initialHistory);
       const firstBotMessage = { role: 'model', text: response };
       
-      // Create a new chat document in Firestore
       const chatData = {
         problem,
         code,
-        messages: [firstBotMessage], // Start with the first message
+        messages: [firstBotMessage],
         createdAt: serverTimestamp()
       };
       const docRef = await addDoc(collection(db, "users", user.uid, "chats"), chatData);
       
-      setActiveChatId(docRef.id); // Set this new chat as the active one
-      setMessages([firstBotMessage]); // Update the UI
-      setSavedChats(prev => [{ id: docRef.id, ...chatData }, ...prev]); // Add to the top of the sidebar list
+      setActiveChatId(docRef.id);
+      setMessages([firstBotMessage]);
+      // Use a functional update to ensure we have the latest state
+      setSavedChats(prevChats => [{ id: docRef.id, ...chatData }, ...prevChats]);
 
     } catch (error) {
       setError(`Error starting interview: ${error.message}`);
@@ -115,10 +132,9 @@ function App() {
   };
 
   const handleSendMessage = async (userInput) => {
-    if (!user || (!activeChatId && messages.length === 0)) {
-        // This case handles starting a new chat by just typing a message
-        // For simplicity, we'll enforce the "Start Interview" button for now.
-        if(!activeChatId) return handleStartInterview();
+    if (!user || !activeChatId) {
+        if(!activeChatId && problem && code) return handleStartInterview();
+        return;
     }
 
     const newUserMessage = { role: 'user', text: userInput };
@@ -128,7 +144,7 @@ function App() {
     setError(null);
 
     const historyForApi = updatedMessages.map(msg => ({
-      role: msg.role,
+      role: msg.role === 'model' ? 'model' : 'user', // Correctly map roles
       parts: [{ text: msg.text }]
     }));
 
@@ -138,13 +154,11 @@ function App() {
       const finalMessages = [...updatedMessages, newBotMessage];
       setMessages(finalMessages);
 
-      // Update the existing chat document in Firestore
-      if (activeChatId) {
-        const chatDocRef = doc(db, "users", user.uid, "chats", activeChatId);
-        await updateDoc(chatDocRef, {
-          messages: finalMessages
-        });
-      }
+      const chatDocRef = doc(db, "users", user.uid, "chats", activeChatId);
+      await updateDoc(chatDocRef, {
+        messages: finalMessages
+      });
+
     } catch (error) {
       setError(`Error fetching response: ${error.message}`);
     } finally {
@@ -158,7 +172,7 @@ function App() {
       <Navbar user={user} signInWithGoogle={signInWithGoogle} signOut={handleSignOut} />
       
       {user ? (
-        <div className="flex w-full h-full">
+        <div className="flex w-full h-full pt-16"> {/* Add padding top to avoid navbar overlap */}
           <Sidebar 
             savedChats={savedChats}
             onSelectChat={handleSelectChat}
@@ -172,7 +186,6 @@ function App() {
               code={code}
               setCode={setCode}
               onStartInterview={handleStartInterview}
-              // Disable inputs if a chat is loaded or ongoing
               interviewStarted={messages.length > 0} 
               error={error}
             />
@@ -180,7 +193,6 @@ function App() {
               messages={messages}
               isLoading={isLoading}
               onSendMessage={handleSendMessage}
-              // Show chat window if there are messages
               interviewStarted={messages.length > 0} 
             />
           </div>

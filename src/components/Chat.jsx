@@ -1,11 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
-import { BotIcon, UserIcon, SendIcon } from './Icons';
+import { BotIcon, UserIcon, SendIcon, MicrophoneIcon } from './Icons';
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+if (recognition) {
+  recognition.continuous = false;
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+}
 
 export default function Chat({ messages, isLoading, onSendMessage, interviewStarted }) {
   const [userInput, setUserInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const chatEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  // Automatically scroll to the bottom of the chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -13,16 +22,69 @@ export default function Chat({ messages, isLoading, onSendMessage, interviewStar
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!userInput.trim() || isLoading) return;
-
     onSendMessage(userInput);
     setUserInput('');
   };
+
+  // voice input logic
+  const handleVoiceInput = () => {
+    if (!recognition) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      recognition.start();
+    }
+  };
+
+  useEffect(() => {
+    if (!recognition) return;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setUserInput(transcript); // Set the input field with the transcribed text
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+  }, []);
+  
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reset height
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${scrollHeight}px`; // Set to content height
+    }
+  }, [userInput]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
 
   return (
     <div className="w-1/2 p-6 flex flex-col bg-gray-800 border-l border-gray-700">
       <h2 className="text-2xl font-bold text-gray-200 mb-4">Technical Interview</h2>
       
       <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+        {/* ... (rest of the message display logic is unchanged) ... */}
         {!interviewStarted ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-500">The interview will appear here.</p>
@@ -65,18 +127,29 @@ export default function Chat({ messages, isLoading, onSendMessage, interviewStar
       </div>
       
       <form onSubmit={handleSubmit} className={`mt-4 flex items-center space-x-2 ${!interviewStarted ? 'hidden' : ''}`}>
-        <input
-          type="text"
+        {/* MODIFIED: Changed from input to textarea */}
+        <textarea
+          ref={textareaRef}
+          rows="1"
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          className="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none transition"
-          placeholder="Your answer..."
+          onKeyDown={handleKeyDown}
+          className="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none transition resize-none overflow-y-auto max-h-40"
+          placeholder={isListening ? "Listening..." : "Your answer..."}
           disabled={isLoading}
         />
+        <button
+          type="button"
+          onClick={handleVoiceInput}
+          className={`p-3 rounded-lg transition-colors self-end ${isListening ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-700'}`}
+          disabled={isLoading}
+        >
+          <MicrophoneIcon />
+        </button>
         <button 
           type="submit" 
-          className="bg-cyan-600 hover:bg-cyan-700 p-3 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors" 
-          disabled={isLoading}
+          className="bg-cyan-600 hover:bg-cyan-700 p-3 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors self-end" 
+          disabled={isLoading || !userInput.trim()}
         >
           <SendIcon />
         </button>
